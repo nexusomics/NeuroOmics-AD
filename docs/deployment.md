@@ -1,6 +1,41 @@
 # Deployment Guide
 
-## 1. Docker Compose (single node)
+Two paths:
+
+1. **Permanent public website (free, ~10 min)** — Render Blueprint (below).
+2. **Self-hosted full stack** — Docker Compose or Kubernetes (further down).
+
+---
+
+## 1. Permanent public URL — Render Blueprint (free)
+
+The repo ships with `render.yaml` + `render.Dockerfile` so the whole platform
+(frontend + API + Postgres) deploys as **one service + one database** on the
+free tier, producing a permanent URL like `https://neuroomics-ad.onrender.com`.
+
+### Steps (your accounts are needed — everything else is prepared)
+
+1. **GitHub** → signup at https://github.com/signup → create an empty repo
+   named `NeuroOmics-AD` (no README) → push the committed code
+   (`git push -u origin main`).
+2. **Render** → https://render.com → Get Started → sign up **with GitHub**.
+3. Render → **New → Blueprint** → connect GitHub → pick `NeuroOmics-AD`.
+4. Render reads `render.yaml`, shows the `neuroomics-ad` web service + the
+   `neuroomics-db` Postgres → **Apply** → first build ~5–8 min.
+5. Copy `ADMIN_PASSWORD` from the service's **Environment** tab (auto-generated).
+6. Open your URL → **Register** a researcher account → done.
+
+Notes:
+- Free tiers sleep after ~15 min idle (first load after sleep ~30–60 s).
+- Free Postgres on Render expires after 30 days (upgrade for long-lived sites).
+- Analyses run inline (`TASK_ALWAYS_EAGER=true`) since free tier has no Redis.
+- Alternative hosts: **Railway** (New Project → Deploy from GitHub → add
+  Postgres plugin) or **Fly.io** (`fly launch`), or a **VPS** with the
+  docker-compose stack below.
+
+---
+
+## 2. Docker Compose (single node, full stack)
 
 ```bash
 cp .env.example .env
@@ -23,7 +58,7 @@ Persistent volumes: `pgdata`, `redisdata`, `media`.
 - Point `DATABASE_URL` at Postgres (done by compose), disable eager tasks.
 - Optional: `ASSISTANT_API_KEY` for LLM mode; `S3_*` for object storage.
 
-## 2. Kubernetes
+## 3. Kubernetes
 
 ```bash
 kubectl create namespace neuroomics || true
@@ -53,7 +88,7 @@ Notes:
 - Ingress host is a placeholder — replace `neuroomics.example.org`.
 - Backend HPA 3–12 replicas; worker HPA 2–8.
 
-## 3. GitHub Actions
+## 4. GitHub Actions
 
 | Workflow | Trigger | What it does |
 |---|---|---|
@@ -65,7 +100,7 @@ Notes:
 
 Secrets to configure: `KUBE_CONFIG` (base64 kubeconfig), `GH_TOKEN`/`GITHUB_TOKEN`.
 
-## 4. Scaling & performance
+## 5. Scaling & performance
 
 - **CPU-bound stats** (DE, meta-analysis, ML): scale `worker` replicas.
 - **API** (concurrent users): scale backend replicas; uvicorn `--workers N`.
@@ -74,7 +109,7 @@ Secrets to configure: `KUBE_CONFIG` (base64 kubeconfig), `GH_TOKEN`/`GITHUB_TOKE
 - **R**: install Bioconductor packages in the image for native R pipelines;
   workers benefit from more memory (peak ~2–4 GB for DESeq2/WGCNA).
 
-## 5. Observability
+## 6. Observability
 
 - Health endpoints: `/api/v1/health`, `/api/v1/info`.
 - Celery Flower at :5555 (task queues, failures, retries).

@@ -7,6 +7,7 @@
 # ---- Stage 1: build the React frontend ----
 FROM node:20-alpine AS frontend-build
 WORKDIR /build
+ENV NODE_OPTIONS=--max-old-space-size=2048
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
