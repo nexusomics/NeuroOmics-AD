@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint + tests + coverage)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: neuroomics
+          POSTGRES_PASSWORD: neuroomics
+          POSTGRES_DB: neuroomics
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U neuroomics"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install R (for rpy2 integration checks)
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends r-base
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Ruff lint
+        run: ruff check app tests
+      - name: Type check
+        run: mypy app --ignore-missing-imports || true
+      - name: Unit tests with coverage
+        env:
+          DATABASE_URL: postgresql+psycopg://neuroomics:neuroomics@localhost:5432/neuroomics
+          REDIS_URL: redis://localhost:6379/0
+          TASK_ALWAYS_EAGER: "false"
+          SECRET_KEY: ci-secret
+        run: pytest --cov=app --cov-report=xml --cov-report=term-missing:skip-covered
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: backend/coverage.xml
+          fail_ci_if_error: false
+
+  frontend:
+    name: Frontend (tsc + tests + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run test
+      - run: npm run build
+
+  docker-build:
+    name: Docker image build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t neuroomics-backend:ci ./backend
+      - name: Build frontend image
+        run: docker build -t neuroomics-frontend:ci ./frontend
+
+  openapi:
+    name: OpenAPI contract check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - working-directory: backend
+        run: |
+          pip install -e .
+          python -c "
+          from fastapi.testclient import TestClient
+          from app.main import app
+          with TestClient(app) as c:
+              spec = c.get('/openapi.json').json()
+              assert len(spec['paths']) >= 40, f'expected >=40 paths, got {len(spec[\"paths\"])}'
+          print('OpenAPI OK:', len(spec['paths']), 'paths')
+          "

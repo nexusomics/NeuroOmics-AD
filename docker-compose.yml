@@ -1,0 +1,128 @@
+# ==========================================================================
+# NeuroOmics-AD full stack: backend API + Celery workers + PostgreSQL + Redis
+# + flower (Celery monitor) + frontend (nginx)
+# Usage:  cp .env.example .env && docker compose up -d --build
+# ==========================================================================
+
+name: neuroomics-ad
+
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  DEBUG: "false"
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-neuroomics}:${POSTGRES_PASSWORD:-neuroomics}@postgres:5432/${POSTGRES_DB:-neuroomics}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  TASK_ALWAYS_EAGER: "false"
+  STORAGE_BACKEND: local
+  STORAGE_ROOT: /app/media
+  CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+  ASSISTANT_MODE: ${ASSISTANT_MODE:-local}
+  ASSISTANT_API_BASE: ${ASSISTANT_API_BASE:-}
+  ASSISTANT_API_KEY: ${ASSISTANT_API_KEY:-}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@neuroomics.org}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_USER: ${POSTGRES_USER:-neuroomics}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neuroomics}
+  POSTGRES_DB: ${POSTGRES_DB:-neuroomics}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neuroomics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neuroomics}
+      POSTGRES_DB: ${POSTGRES_DB:-neuroomics}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neuroomics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment: *backend-env
+    volumes:
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    environment: *backend-env
+    volumes:
+      - media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app.celery_app worker -l info --concurrency=4
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./backend
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app.celery_app beat -l info
+    restart: unless-stopped
+
+  flower:
+    image: mher/flower:2.0
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-/api/v1}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  media:

@@ -1,0 +1,57 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", "README.md"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Build & publish documentation site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Build docs site
+        working-directory: docs
+        run: |
+          pip install mkdocs-material
+          # generate a minimal mkdocs.yml if absent
+          if [ ! -f mkdocs.yml ]; then
+            python - <<'PY'
+            import pathlib
+            pages = sorted(pathlib.Path(".").glob("*.md"))
+            nav = []
+            for p in pages:
+                if p.name in ("index.md", "journal-manuscript-outline.md"):
+                    continue
+                nav.append({"title": p.stem.replace("-", " ").title(), "path": p.name})
+            mkdocs = {
+                "site_name": "NeuroOmics-AD Docs",
+                "theme": {"name": "material", "palette": {"scheme": "slate", "primary": "teal"}},
+                "nav": [{"Home": "index.md"}] + [{n["title"]: n["path"]} for n in nav],
+            }
+            import yaml
+            pathlib.Path("mkdocs.yml").write_text(yaml.dump(mkdocs))
+            pathlib.Path("index.md").write_text("# NeuroOmics-AD Documentation\n\n" + "\n".join(f"- [{p.stem.replace('-',' ').title()}]({p.name})" for p in pages if p.name != "index.md"))
+            PY
+          fi
+          mkdocs build --strict --site-dir ../site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deployment
+        uses: actions/deploy-pages@v4

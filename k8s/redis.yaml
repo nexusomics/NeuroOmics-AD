@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neuroomics-redis
+  namespace: neuroomics
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: neuroomics-redis }
+  template:
+    metadata:
+      labels: { app: neuroomics-redis }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - { containerPort: 6379 }
+          volumeMounts:
+            - { name: redisdata, mountPath: /data }
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+      volumes:
+        - name: redisdata
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neuroomics-redis
+  namespace: neuroomics
+spec:
+  selector: { app: neuroomics-redis }
+  ports:
+    - { port: 6379 }

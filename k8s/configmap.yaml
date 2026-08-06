@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neuroomics-config
+  namespace: neuroomics
+data:
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  API_V1_PREFIX: "/api/v1"
+  DATABASE_URL: "postgresql+psycopg://neuroomics:neuroomics@neuroomics-postgres:5432/neuroomics"
+  REDIS_URL: "redis://neuroomics-redis:6379/0"
+  CELERY_BROKER_URL: "redis://neuroomics-redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://neuroomics-redis:6379/1"
+  TASK_ALWAYS_EAGER: "false"
+  STORAGE_BACKEND: "local"
+  STORAGE_ROOT: "/app/media"
+  CORS_ORIGINS: "https://neuroomics.example.org"
+  ASSISTANT_MODE: "local"
+  ADMIN_EMAIL: "admin@neuroomics.org"
+  LOG_LEVEL: "INFO"

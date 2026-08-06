@@ -1,0 +1,64 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.db
+*.sqlite3
+.ipynb_checkpoints/
+
+# --- Node ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+
+# --- Env & secrets ---
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Runtime artifacts ---
+backend/media/
+backend/reports_generated/
+backend/artifacts/
+celerybeat-schedule*
+celerybeat.pid
+*.log
+
+# --- Data (never commit real omics data) ---
+*.fastq
+*.bam
+*.bai
+*.vcf
+*.bed
+*.gmt.raw
+data/
+uploads/
+
+# --- local runtime data (never commit) ---
+/media/
+/backend/neuroomics.db
+/backend/test_neuroomics.db
+.mlcache/
+site/

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neuroomics-worker
+  namespace: neuroomics
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: neuroomics-worker }
+  template:
+    metadata:
+      labels: { app: neuroomics-worker }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/your-org/neuroomics-ad-backend:latest
+          command: ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "-l", "info", "--concurrency=4"]
+          envFrom:
+            - configMapRef: { name: neuroomics-config }
+            - secretRef: { name: neuroomics-secrets }
+          volumeMounts:
+            - { name: media, mountPath: /app/media }
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits: { cpu: "4", memory: "8Gi" }
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: neuroomics-media
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neuroomics-flower
+  namespace: neuroomics
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: neuroomics-flower }
+  template:
+    metadata:
+      labels: { app: neuroomics-flower }
+    spec:
+      containers:
+        - name: flower
+          image: mher/flower:2.0
+          args: ["--port=5555"]
+          env:
+            - { name: CELERY_BROKER_URL, value: "redis://neuroomics-redis:6379/0" }
+          ports:
+            - { containerPort: 5555 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neuroomics-flower
+  namespace: neuroomics
+spec:
+  selector: { app: neuroomics-flower }
+  ports:
+    - { port: 5555 }

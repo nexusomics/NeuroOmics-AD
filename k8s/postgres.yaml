@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neuroomics-postgres
+  namespace: neuroomics
+spec:
+  serviceName: neuroomics-postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: neuroomics-postgres }
+  template:
+    metadata:
+      labels: { app: neuroomics-postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_USER, value: "neuroomics" }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: neuroomics-secrets, key: POSTGRES_PASSWORD }
+            - { name: POSTGRES_DB, value: "neuroomics" }
+          ports:
+            - { containerPort: 5432, name: pg }
+          volumeMounts:
+            - { name: pgdata, mountPath: /var/lib/postgresql/data }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "neuroomics"]
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "2", memory: "4Gi" }
+  volumeClaimTemplates:
+    - metadata: { name: pgdata }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 20Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neuroomics-postgres
+  namespace: neuroomics
+spec:
+  clusterIP: None
+  selector: { app: neuroomics-postgres }
+  ports:
+    - { port: 5432, name: pg }

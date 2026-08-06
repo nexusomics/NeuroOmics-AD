@@ -1,0 +1,31 @@
+# Development overlay: hot-reload backend, vite dev frontend, SQLite fallback
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+name: neuroomics-ad-dev
+
+services:
+  backend:
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      TASK_ALWAYS_EAGER: "true"
+      DATABASE_URL: sqlite:////app/neuroomics.db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+      - media:/app/media
+
+  worker:
+    environment:
+      TASK_ALWAYS_EAGER: "true"
+    command: celery -A app.workers.celery_app.celery_app worker -l info --pool=solo
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
