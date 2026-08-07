@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,27 +112,45 @@ def create_app() -> FastAPI:
     def root() -> Any:
         # In production the compiled SPA is served at "/" (login page);
         # in dev (no dist) we return a small JSON pointer instead.
-        from pathlib import Path
-
         from fastapi.responses import FileResponse
 
-        index = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist" / "index.html"
-        if index.exists():
-            return FileResponse(index)
+        dist = _find_frontend_dist()
+        if dist is not None:
+            return FileResponse(dist / "index.html")
         return {"app": settings.APP_NAME, "version": __version__, "docs": "/docs", "health": "/api/v1/health"}
 
     return app
 
 
-def _mount_frontend(app: FastAPI) -> None:
-    """Serve the compiled React app from `frontend/dist` when present (SPA fallback)."""
+def _find_frontend_dist() -> Optional[Path]:
+    """Locate the compiled SPA across supported layouts.
+
+    Local repo layout:   <repo>/backend/app/main.py -> <repo>/frontend/dist
+    Container layout:    /app/app/main.py          -> /app/frontend/dist
+    Override:            FRONTEND_DIST_PATH env var
+    """
+    import os
     from pathlib import Path
 
+    override = os.environ.get("FRONTEND_DIST_PATH")
+    if override:
+        p = Path(override)
+        if (p / "index.html").exists():
+            return p
+    base = Path(__file__).resolve().parent.parent
+    for candidate in (base / "frontend" / "dist", base.parent / "frontend" / "dist"):
+        if (candidate / "index.html").exists():
+            return candidate
+    return None
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve the compiled React app from `frontend/dist` when present (SPA fallback)."""
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
 
-    dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-    if not (dist / "index.html").exists():
+    dist = _find_frontend_dist()
+    if dist is None:
         return
 
     assets = dist / "assets"
