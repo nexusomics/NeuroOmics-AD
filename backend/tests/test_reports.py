@@ -169,3 +169,19 @@ def test_full_api_flow(client, auth_headers, project_id, synthetic_omics):
         "project_id": project_id, "analysis_ids": [analysis_id]})
     assert r.status_code == 200
     assert r.json()["reply"]
+
+
+def test_failing_analysis_returns_201_not_500(client, auth_headers, project_id):
+    """Regression: a failing analysis must create the row (201) with a readable
+    error, NOT return 500 (the old eager-mode behavior)."""
+    # genomics analysis with no genomics dataset -> dispatch raises
+    r = client.post(f"/api/v1/analyses/{project_id}/create", headers=auth_headers, json={
+        "name": "bad-gwas", "analysis_type": "genomics",
+        "config": {"dataset_id": "does-not-exist"}})
+    assert r.status_code == 201, r.text  # created even though execution fails
+    aid = r.json()["id"]
+    r = client.get(f"/api/v1/analyses/{aid}", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["status"] == "failed"
+    assert r.json()["error_message"]  # readable reason present
+    assert "GWAS" in r.json()["error_message"] or "dataset" in r.json()["error_message"].lower()

@@ -59,7 +59,14 @@ def _save_artifact(analysis_id: str, name: str, kind: str, fmt: str, path: Path,
 
 @celery_app.task(name="app.workers.tasks.run_analysis_task", bind=True, track_started=True)
 def run_analysis_task(self, analysis_id: str) -> dict:
-    """Dispatch an analysis to the appropriate service based on its type."""
+    """Dispatch an analysis to the appropriate service based on its type.
+
+    Failure handling: the analysis row is marked `failed` with a readable
+    error_message, and the task returns a failure payload WITHOUT re-raising —
+    so in eager mode (dev/Render free tier) the API returns the created
+    analysis (201) instead of a 500, while Celery still records FAILURE state
+    for monitoring.
+    """
     from app.core.database import init_db
     from app.services.analysis_dispatch import dispatch_analysis
 
@@ -76,7 +83,11 @@ def run_analysis_task(self, analysis_id: str) -> dict:
     except Exception as exc:  # noqa: BLE001
         logger.error("analysis %s failed: %s\n%s", analysis_id, exc, traceback.format_exc())
         _update_analysis(analysis_id, status="failed", error_message=str(exc)[:2000], finished_at=datetime.now(timezone.utc))
-        raise
+        try:
+            self.update_state(state="FAILURE", meta={"error": str(exc)[:2000]})
+        except Exception:  # noqa: BLE001
+            pass
+        return {"analysis_id": analysis_id, "status": "failed", "error": str(exc)[:2000]}
     finally:
         db.close()
 

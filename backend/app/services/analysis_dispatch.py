@@ -252,11 +252,31 @@ def _run_integration(analysis, cfg, db, progress_cb) -> dict:
     from app.services.visualization import pca_plot, write_plotly_json
     from sklearn.decomposition import PCA
 
-    matrices = []
-    for ds_id in cfg["dataset_ids"]:
+    ds_ids = cfg.get("dataset_ids") or []
+    if len(ds_ids) < 2:
+        raise ValueError("Multi-omics integration requires ≥ 2 expression datasets (e.g. transcriptomics + proteomics). "
+                         "Open the Analysis form and select two or more datasets of omics type transcriptomics / proteomics / metabolomics / epigenomics.")
+    matrices, names = [], []
+    for ds_id in ds_ids:
+        ds = db.get(__import__("app.models.dataset", fromlist=["Dataset"]).Dataset, ds_id)
+        if not ds:
+            raise ValueError(f"dataset {ds_id} not found")
+        if ds.omics_type == "clinical":
+            raise ValueError(f"dataset '{ds.name}' is a clinical/metadata file and cannot be used for integration — "
+                             "select expression datasets (transcriptomics/proteomics/metabolomics/epigenomics).")
         m, _ = _load_dataset_matrix(db, ds_id)
         matrices.append(m)
+        names.append(ds.name)
+    # intersect samples across blocks; error clearly if none overlap
+    common = set(matrices[0].columns)
+    for m in matrices[1:]:
+        common &= set(m.columns)
+    if len(common) < 5:
+        raise ValueError("Datasets share too few samples for integration. "
+                         "Ensure the selected datasets were measured on the same samples (sample IDs must match).")
+    matrices = [m[list(common)] for m in matrices]
     res = integrate(matrices, method=cfg.get("method", "weighted_fusion"), rank=cfg.get("rank", 5))
+    res["datasets_used"] = names
     out_dir = artifact_dir(analysis.id)
     res["factors"].to_csv(out_dir / "integrated_factors.csv")
     pca = PCA(n_components=2).fit_transform(res["factors"].values)
@@ -316,7 +336,10 @@ def _run_genomics(analysis, cfg, db, progress_cb) -> dict:
     gwas = pd.read_csv(resolve_dataset_path(ds.file_path), sep="\t" if str(ds.file_path).endswith((".tsv", ".txt")) else ",")
     missing = validate_gwas_summary(gwas)
     if missing:
-        raise ValueError(f"GWAS summary missing required columns: {missing}")
+        raise ValueError(
+            f"GWAS analysis requires a summary-statistics file with columns: rsid, chrom, pos, beta, se, pvalue, effect_allele. "
+            f"Dataset '{ds.name}' ({ds.omics_type}) is missing: {missing}. "
+            "Upload a GWAS summary-stats file as a 'genomics' dataset, or choose a different analysis type for expression data.")
     gwas["lambda_gc"] = genomic_inflation_lambda(gwas["pvalue"].values)
     sig = manhattan_signal(gwas, fdr_threshold=cfg.get("fdr_threshold", 5e-8))
     out_dir = artifact_dir(analysis.id)
