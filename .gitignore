@@ -19,7 +19,6 @@ htmlcov/
 
 # --- Node ---
 node_modules/
-frontend/dist/
 frontend/.vite/
 *.tsbuildinfo
 npm-debug.log*
@@ -62,3 +61,7 @@ uploads/
 /backend/test_neuroomics.db
 .mlcache/
 site/
+
+# --- prebuilt frontend bundle is committed for lightweight deploys ---
+!frontend/dist/
+!frontend/dist/**

@@ -1,39 +1,37 @@
 # ==========================================================================
 # NeuroOmics-AD — single-service production image (frontend + backend + SPA).
-# Used by Render / Railway / any Docker host. The compiled React app is served
-# by FastAPI itself, so only ONE service + one Postgres are required.
+# Used by Render / Railway / any Docker host.
+#
+# IMPORTANT: the React frontend is PREBUILT (frontend/dist is committed to the
+# repo) so no Node build happens here — that keeps the image small and avoids
+# OOM on free-tier builders. Rebuild locally with: cd frontend && npm run build
+#
+# render.requirements.txt omits torch & rpy2 (they need huge/CUDA or R to
+# build); the platform automatically uses its Python fallbacks for DNN/GNN and
+# DE when they are absent.
 # ==========================================================================
 
-# ---- Stage 1: build the React frontend ----
-FROM node:20-alpine AS frontend-build
-WORKDIR /build
-ENV NODE_OPTIONS=--max-old-space-size=2048
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY frontend/ ./
-ARG VITE_API_BASE=/api/v1
-ENV VITE_API_BASE=${VITE_API_BASE}
-RUN npm run build
-
-# ---- Stage 2: Python backend ----
-FROM python:3.11-slim AS backend-base
+FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     MPLCONFIGDIR=/tmp/mpl \
     DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev gcc g++ libopenblas0 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-COPY backend/requirements.txt .
+COPY backend/render.requirements.txt requirements.txt
 RUN pip install --upgrade pip && pip install -r requirements.txt
+
 COPY backend/ ./
+COPY frontend/dist ./frontend/dist
+
 RUN useradd -m neuroomics && chown -R neuroomics /app
 USER neuroomics
 
-# ---- Stage 3: combine ----
-FROM backend-base AS runtime
-COPY --from=frontend-build /build/dist /app/frontend/dist
 EXPOSE 8000
-CMD ["sh", "-c", "python -m alembic upgrade head 2>/dev/null || true; uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"]
+# Wait for Postgres (up to 60s) before migrating, then serve API + SPA.
+CMD ["sh", "-c", "for i in $(seq 1 30); do python -m alembic upgrade head && break || sleep 2; done; exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"]
