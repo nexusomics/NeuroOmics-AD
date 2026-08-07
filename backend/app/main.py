@@ -109,7 +109,16 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"detail": "Internal server error", "type": type(exc).__name__})
 
     @app.get("/", include_in_schema=False)
-    def root() -> dict[str, Any]:
+    def root() -> Any:
+        # In production the compiled SPA is served at "/" (login page);
+        # in dev (no dist) we return a small JSON pointer instead.
+        from pathlib import Path
+
+        from fastapi.responses import FileResponse
+
+        index = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist" / "index.html"
+        if index.exists():
+            return FileResponse(index)
         return {"app": settings.APP_NAME, "version": __version__, "docs": "/docs", "health": "/api/v1/health"}
 
     return app
