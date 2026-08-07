@@ -11,6 +11,7 @@ import AnalysisDetailPage from "./pages/AnalysisDetailPage";
 import VisualizationPage from "./pages/VisualizationPage";
 import MLPage from "./pages/MLPage";
 import DrugsPage from "./pages/DrugsPage";
+import CausalPage from "./pages/CausalPage";
 import ReportsPage from "./pages/ReportsPage";
 import AssistantPage from "./pages/AssistantPage";
 import AdminPage from "./pages/AdminPage";
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="projects/:id/visualization" element={<VisualizationPage />} />
         <Route path="projects/:id/ml" element={<MLPage />} />
         <Route path="projects/:id/drugs" element={<DrugsPage />} />
+        <Route path="projects/:id/causal" element={<CausalPage />} />
         <Route path="projects/:id/reports" element={<ReportsPage />} />
         <Route path="projects/:id/assistant" element={<AssistantPage />} />
         <Route path="analyses/:analysisId" element={<AnalysisDetailPage />} />

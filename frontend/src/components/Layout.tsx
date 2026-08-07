@@ -12,6 +12,7 @@ const OMICS_TOOLS = [
   { to: "/visualization", label: "Visualization" },
   { to: "/ml", label: "ML Models" },
   { to: "/drugs", label: "Drug Repurposing" },
+  { to: "/causal", label: "Causal Discovery" },
   { to: "/reports", label: "Reports" },
   { to: "/assistant", label: "AI Assistant" },
 ];

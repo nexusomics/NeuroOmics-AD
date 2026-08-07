@@ -47,6 +47,7 @@ extensible (plugin architecture) and transferable to other complex diseases** (P
 | **Visualization** | Volcano plots, heatmaps, PCA, UMAP, t-SNE, enrichment plots, PPI networks, drug–target maps, Sankey diagrams; interactive (Plotly/D3) + publication-quality static figures (300–600 dpi) |
 | **Reporting** | Automatic reports in **PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV and HTML** with methods, results, statistics, figures, tables, interpretation and references |
 | **AI Assistant** | Research assistant that interprets results, explains biological significance, recommends targets / drug combinations and drafts **manuscript-ready Results & Discussion** sections |
+| **Causal multi-omics (new)** | Harmonized Knight-ADRC / ADSP R4 / AMP-AD multi-ethnic / plasma multi-ancestry catalog; SVA/ComBat/LMM QC; MOFA/PLS/VAE latent fusion; NOTEARS + DML + PC causal inference; ancestry-stratified trans-ethnic meta; consensus multi-omics subtyping with drug/pathway/progression enrichment (`docs/causal-module-spec.md`) |
 | **Platform** | JWT authentication, RBAC, project management, Celery task pipeline, plugin architecture, OpenAPI/Swagger, CI/CD (GitHub Actions), Docker & Kubernetes, full test suite |
 
 ## 🧱 Architecture at a glance

@@ -108,6 +108,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 export const api = {
+  raw: <T = unknown>(path: string, options: RequestInit = {}) => raw<T>(path, options),
   // auth
   register: (data: { email: string; password: string; full_name: string; organization?: string }) =>
     raw("/auth/register", { method: "POST", body: JSON.stringify(data) }),

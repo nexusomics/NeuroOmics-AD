@@ -10,6 +10,9 @@
 - [Deployment Guide](deployment.md)
 - [Plugin Architecture](plugins.md)
 - [Journal Manuscript Outline](journal-manuscript-outline.md)
+- [Causal Multi-Omics Module Spec](causal-module-spec.md)
+- [Causal Module User Guide](causal-user-guide.md)
+- [Causal Module Literature Review](causal-literature-review.md)
 
 ## Quick links
 
