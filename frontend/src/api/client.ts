@@ -115,6 +115,10 @@ export const api = {
   login: (email: string, password: string) =>
     raw<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   me: () => raw<User>("/auth/me"),
+  updateMe: (data: { full_name?: string; organization?: string }) =>
+    raw<User>("/auth/me", { method: "PATCH", body: JSON.stringify(data) }),
+  changePassword: (data: { old_password: string; new_password: string }) =>
+    raw<{ message: string }>("/auth/me/change-password", { method: "POST", body: JSON.stringify(data) }),
 
   // projects
   projects: () => raw<Project[]>("/projects"),

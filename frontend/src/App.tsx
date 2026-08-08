@@ -15,6 +15,7 @@ import CausalPage from "./pages/CausalPage";
 import ReportsPage from "./pages/ReportsPage";
 import AssistantPage from "./pages/AssistantPage";
 import AdminPage from "./pages/AdminPage";
+import AccountPage from "./pages/AccountPage";
 
 function Protected({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="projects/:id/assistant" element={<AssistantPage />} />
         <Route path="analyses/:analysisId" element={<AnalysisDetailPage />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="account" element={<AccountPage />} />
       </Route>
     </Routes>
   );

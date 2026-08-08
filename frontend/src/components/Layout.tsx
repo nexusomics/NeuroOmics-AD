@@ -96,6 +96,12 @@ export default function Layout() {
               <div className="truncate text-[10px] text-slate-500">{user?.email}</div>
             </div>
           </div>
+          <NavLink
+            to="/account"
+            className="mb-1 block rounded-lg border border-ink-600 px-3 py-1.5 text-center text-xs font-semibold text-slate-300 hover:bg-ink-700/50"
+          >
+            ⚙ Account settings
+          </NavLink>
           <button
             className="w-full rounded-lg border border-ink-600 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-ink-700/50"
             onClick={() => {
