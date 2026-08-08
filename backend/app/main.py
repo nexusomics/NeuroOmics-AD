@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -53,8 +54,22 @@ def _ensure_admin_user() -> None:
             db.add(admin)
             db.commit()
             logger.info("created default admin user")
+        # Demo researcher account — created on ANY database (local + Render) so
+        # the documented demo login works everywhere.
+        if settings.ENVIRONMENT != "production" or os.environ.get("SEED_DEMO_USER", "true").lower() == "true":
+            if not db.query(User).filter(User.email == "demo@neuroomics.org").first():
+                db.add(User(
+                    email="demo@neuroomics.org",
+                    full_name="Demo Researcher",
+                    hashed_password=hash_password("demo12345"),
+                    role="researcher",
+                    organization="NeuroOmics Demo Lab",
+                    is_verified=True,
+                ))
+                db.commit()
+                logger.info("created demo user (demo@neuroomics.org / demo12345)")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("could not ensure admin user: %s", exc)
+        logger.warning("could not ensure admin/demo users: %s", exc)
     finally:
         db.close()
 
