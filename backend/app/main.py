@@ -179,10 +179,14 @@ def _mount_frontend(app: FastAPI) -> None:
         try:
             candidate.relative_to(dist.resolve())
         except ValueError:
-            return FileResponse(dist / "index.html")
+            return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
         if candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(dist / "index.html")
+            headers = {"Cache-Control": "no-cache"}
+            name = candidate.name
+            if name.startswith("index.") and len(name.split(".")) >= 3:
+                headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+            return FileResponse(candidate, headers=headers)
+        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 app = create_app()
