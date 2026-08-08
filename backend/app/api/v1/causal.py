@@ -34,8 +34,6 @@ def _jsonable(obj):
     if isinstance(obj, np.ndarray):
         return _jsonable(obj.tolist())
     return obj
-from app.causal.data.synth import generate_causal_dataset
-from app.causal.pipeline import run_causal_pipeline
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
@@ -86,6 +84,10 @@ def run_pipeline(
     """
     mode = payload.get("mode", "synthetic")
     options = payload.get("options", {}) or {}
+    # lazy imports: keep app startup light (free-tier hosts)
+    from app.causal.data.synth import generate_causal_dataset
+    from app.causal.pipeline import run_causal_pipeline
+
     if mode == "synthetic":
         data = generate_causal_dataset(n_per_ancestry=options.get("n_per_ancestry", 100), seed=options.get("seed", 42))
         out_dir = settings.storage_path / "causal" / "runs"

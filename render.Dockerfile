@@ -34,5 +34,7 @@ RUN useradd -m neuroomics && chown -R neuroomics /app
 USER neuroomics
 
 EXPOSE 8000
-# Wait for DB (up to 60s) before migrating, then serve API + SPA.
-CMD ["sh", "-c", "for i in $(seq 1 30); do python -m alembic upgrade head && break || sleep 2; done; exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"]
+# Fast startup: the app's lifespan runs init_db() (create_all) which handles
+# the schema, so we do NOT block on alembic here — critical on free-tier
+# instances where a slow boot fails Render's health-check grace period.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"]
