@@ -24,8 +24,102 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     init_db()
     _load_plugins()
     _ensure_admin_user()
+    _seed_demo_content()
     logger.info("NeuroOmics-AD %s started (env=%s)", __version__, settings.ENVIRONMENT)
     yield
+
+
+def _seed_demo_content() -> None:
+    """Create the demo project + synthetic datasets on ANY database, once.
+
+    On hosts with ephemeral storage (Render free tier uses SQLite on a
+    container disk that resets on redeploy), this guarantees the dashboard
+    always shows the demo project with data immediately after login, instead
+    of an empty workspace.
+    """
+    try:
+        import numpy as np
+        import pandas as pd
+
+        from app.core.database import SessionLocal
+        from app.core.security import hash_password
+        from app.models.dataset import Dataset
+        from app.models.project import Project
+        from app.models.user import User
+
+        db = SessionLocal()
+        try:
+            demo_user = db.query(User).filter(User.email == "demo@neuroomics.org").first()
+            if demo_user is None:
+                demo_user = User(email="demo@neuroomics.org", full_name="Demo Researcher",
+                                 hashed_password=hash_password("demo12345"), role="researcher",
+                                 organization="NeuroOmics Demo Lab", is_verified=True)
+                db.add(demo_user)
+                db.commit()
+                db.refresh(demo_user)
+            project = db.query(Project).filter(Project.owner_id == demo_user.id).first()
+            if project is not None:
+                return  # already seeded
+            project = Project(name="ROSMAP-style AD multi-omics demo",
+                              description="Synthetic multi-omics dataset emulating an AD vs CN cohort for end-to-end platform demos.",
+                              disease="Alzheimer's disease", owner_id=demo_user.id)
+            db.add(project)
+            db.commit()
+            db.refresh(project)
+
+            rng = np.random.default_rng(2026)
+            curated = ["APP", "BACE1", "PSEN1", "APOE", "TREM2", "TYROBP", "MAPT", "GSK3B",
+                       "IL1B", "TNF", "IL6", "CLU", "SORL1", "HMOX1", "MTOR", "BECN1", "GFAP", "CSF1R"]
+            genes = [f"GENE{i:04d}" for i in range(1, 220)] + curated
+            ad = [f"AD_{i:03d}" for i in range(20)]
+            cn = [f"CN_{i:03d}" for i in range(20)]
+            X = rng.lognormal(0, 1.3, size=(len(genes), 40))
+            expr = pd.DataFrame(X, index=genes, columns=ad + cn)
+            for g in ["APP", "BACE1", "IL1B", "TNF", "IL6", "TYROBP", "TREM2", "APOE", "HMOX1", "GFAP"]:
+                expr.loc[g, ad] *= 4.0
+            for g in ["MTOR", "BECN1"]:
+                expr.loc[g, ad] *= 0.4
+            meta = pd.DataFrame({"group": ["AD"] * 20 + ["CN"] * 20,
+                                 "batch": ["B1", "B2"] * 10 + ["B1", "B2"] * 10}, index=expr.columns)
+
+            from app.utils.files import save_upload
+
+            import io
+
+            def _write_df(df, name):
+                buf = io.StringIO()
+                df.to_csv(buf)
+                path, _ = save_upload(buf.getvalue().encode(), name, subdir="demo")
+                return str(path)
+
+            expr_path = _write_df(expr, "transcriptomics_expression.csv")
+            meta_path = _write_df(meta, "transcriptomics_metadata.csv")
+            db.add(Dataset(project_id=project.id, name="RNA-seq expression (bulk)", omics_type="transcriptomics",
+                           platform="Illumina HiSeq", file_path=expr_path, format="csv",
+                           n_samples=expr.shape[1], n_features=expr.shape[0], status="ready", uploaded_by=demo_user.id,
+                           metadata_json={"metadata_file": meta_path, "source": "synthetic"}))
+            prot = pd.DataFrame(rng.lognormal(0, 0.8, size=(80, 40)), index=[f"P{i:04d}" for i in range(80)], columns=expr.columns)
+            for g in ["GFAP", "NEFL", "CLU", "CFH", "B2M", "APOD", "TREM2", "IL6"]:
+                if g not in prot.index:
+                    continue
+                prot.loc[g, ad] *= 2.0
+            prot_path = _write_df(prot, "proteomics.csv")
+            db.add(Dataset(project_id=project.id, name="Plasma proteomics (SomaScan-like)", omics_type="proteomics",
+                           platform="SomaScan 7K", file_path=prot_path, format="csv",
+                           n_samples=prot.shape[1], n_features=prot.shape[0], status="ready", uploaded_by=demo_user.id,
+                           metadata_json={"metadata_file": meta_path, "source": "synthetic"}))
+            met = pd.DataFrame(rng.lognormal(0, 0.7, size=(60, 40)), index=[f"M{i:04d}" for i in range(60)], columns=expr.columns)
+            met_path = _write_df(met, "metabolomics.csv")
+            db.add(Dataset(project_id=project.id, name="Serum metabolomics (NMR)", omics_type="metabolomics",
+                           platform="NMR", file_path=met_path, format="csv",
+                           n_samples=met.shape[1], n_features=met.shape[0], status="ready", uploaded_by=demo_user.id,
+                           metadata_json={"metadata_file": meta_path, "source": "synthetic"}))
+            db.commit()
+            logger.info("seeded demo project '%s' with 3 synthetic datasets", project.name)
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("demo-content seeding skipped: %s", exc)
 
 
 def _load_plugins() -> None:
