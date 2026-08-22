@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Literal
+from typing import Annotated, List, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -31,7 +31,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-    CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
+    # NoDecode keeps comma-separated strings from .env / env vars intact so the
+    # field_validator below can split them (pydantic-settings would otherwise
+    # try to JSON-decode the value and raise).
+    CORS_ORIGINS: Annotated[List[str], NoDecode] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
 
     # --- database ---
     DATABASE_URL: str = "sqlite:///./neuroomics.db"
@@ -65,6 +68,9 @@ class Settings(BaseSettings):
     DRUG_API_TIMEOUT: int = 10
     DRUG_ENABLE_LIVE_API: bool = False
     DRUG_DATABANK_XML_PATH: str = ""
+    # Local signature files (relative paths resolve against the backend/ dir).
+    LINCS_SIGNATURES_PATH: str = "data/lincs/compound_signatures.csv"
+    CMAP_SIGNATURES_PATH: str = "data/cmap/cmap_signatures.csv"
     CLINICALTRIALS_API_KEY: str = ""
 
     # --- AI research assistant ---
@@ -79,7 +85,7 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin12345"
 
     # --- plugin system ---
-    PLUGINS: List[str] = Field(default_factory=list)  # dotted paths of plugin modules to load
+    PLUGINS: Annotated[List[str], NoDecode] = Field(default_factory=list)  # dotted paths of plugin modules to load
 
     # --- rate limiting / security ---
     MAX_UPLOAD_MB: int = 2048

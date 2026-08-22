@@ -120,6 +120,7 @@ python scripts/seed_demo.py        # optional: demo project + synthetic multi-om
 | [`docs/data-model.md`](docs/data-model.md) | Database schema & result data structures |
 | [`docs/deployment.md`](docs/deployment.md) | Docker, Docker Compose, Kubernetes (Helm-less manifests), CI/CD |
 | [`docs/plugins.md`](docs/plugins.md) | Plugin architecture & how to add an omics module |
+| [`docs/data-sources.md`](docs/data-sources.md) | Registry of associated external databases (ChEMBL, Open Targets, DGIdb, DrugBank, LINCS/CMap, GO/KEGG/Reactome, STRING, AD cohort portals) + how to enable & verify |
 | [`docs/journal-manuscript-outline.md`](docs/journal-manuscript-outline.md) | Manuscript-ready outline for a methods paper |
 
 ## 🗂 Repository layout
