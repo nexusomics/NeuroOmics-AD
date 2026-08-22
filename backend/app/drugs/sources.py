@@ -8,14 +8,21 @@ knowledge base (`knowledge.py`) is used instead. All results are cached.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
 
-from app.core.config import settings
+from app.core.config import BASE_DIR, settings
 from app.core.redis import cache
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_path(path: str) -> Path:
+    """Resolve a configured data path, treating relative paths as backend-rooted."""
+    p = Path(path)
+    return p if p.is_absolute() else (BASE_DIR / p)
 
 
 class BaseSource:
@@ -133,9 +140,10 @@ class DrugBankSource(BaseSource):
     name = "drugbank"
 
     def fetch(self, genes: list[str], drugs: list[dict]) -> list[dict]:
-        path = settings.DRUG_DATABANK_XML_PATH
-        if not path:
+        configured = settings.DRUG_DATABANK_XML_PATH
+        if not configured:
             return []
+        path = _resolve_path(configured)
         try:
             import xml.etree.ElementTree as ET
 
@@ -169,9 +177,8 @@ class LINCSSource(BaseSource):
 
     def fetch(self, genes: list[str], drugs: list[dict]) -> list[dict]:
         import pandas as pd
-        from pathlib import Path
 
-        p = Path("data/lincs/compound_signatures.csv")
+        p = _resolve_path(settings.LINCS_SIGNATURES_PATH)
         if not p.exists():
             return []
         try:
@@ -192,9 +199,7 @@ class CMapSource(BaseSource):
     name = "cmap"
 
     def fetch(self, genes: list[str], drugs: list[dict]) -> list[dict]:
-        from pathlib import Path
-
-        p = Path("data/cmap/cmap_signatures.csv")
+        p = _resolve_path(settings.CMAP_SIGNATURES_PATH)
         if not p.exists():
             return []
         try:
